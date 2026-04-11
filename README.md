@@ -1,6 +1,6 @@
 # GPU Audio Visualizer
 VIST/ECEN 489 – Spring 2026  
-Anthony Guzman & [Partner Name]
+Anthony Guzman & Jason Agnew
 
 ## Project Goal
 This project explores GPU-accelerated audio preprocessing and visualization using NVIDIA CUDA and NVIDIA DALI.
