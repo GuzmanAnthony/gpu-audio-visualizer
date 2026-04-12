@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GPU Audio Visualizer</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app-shell">
+      <canvas id="scene"></canvas>
+
+      <aside class="panel panel-left">
+        <div class="panel-header">
+          <p class="eyebrow">VIST / ECEN 489</p>
+          <h1>3D Procedural Audio Visualizer</h1>
+          <p class="subcopy">
+            Load a prerecorded audio file and turn it into a reactive 3D orb.
+          </p>
+        </div>
+
+        <div class="control-group">
+          <label for="audio-file" class="label">Upload audio</label>
+          <input id="audio-file" type="file" accept="audio/*" />
+          <button id="sample-button" class="button secondary">Load bundled sample</button>
+          <button id="play-button" class="button" disabled>Play</button>
+        </div>
+
+        <div class="control-group compact">
+          <label for="sensitivity" class="label">Sensitivity</label>
+          <input id="sensitivity" type="range" min="0.4" max="3.0" step="0.05" value="1.25" />
+          <div class="range-value"><span id="sensitivity-value">1.25x</span></div>
+        </div>
+
+        <div class="dropzone" id="dropzone">
+          <strong>Drag & drop audio here</strong>
+          <span>WAV, MP3, M4A, OGG, and browser-supported audio formats</span>
+        </div>
+      </aside>
+
+      <aside class="panel panel-right">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span>File</span>
+            <strong id="file-name">None loaded</strong>
+          </div>
+          <div class="stat-card">
+            <span>Duration</span>
+            <strong id="duration">0.00 s</strong>
+          </div>
+          <div class="stat-card">
+            <span>Sample Rate</span>
+            <strong id="sample-rate">--</strong>
+          </div>
+          <div class="stat-card">
+            <span>Status</span>
+            <strong id="status">Idle</strong>
+          </div>
+          <div class="stat-card">
+            <span>RMS</span>
+            <strong id="rms">0.000</strong>
+          </div>
+          <div class="stat-card">
+            <span>Average Freq</span>
+            <strong id="avg-freq">0.0</strong>
+          </div>
+          <div class="stat-card accent">
+            <span>Bass</span>
+            <strong id="bass">0.0</strong>
+          </div>
+          <div class="stat-card accent">
+            <span>Treble</span>
+            <strong id="treble">0.0</strong>
+          </div>
+        </div>
+
+        <div class="notes">
+          <p>
+            Tip: use the mouse to orbit the camera. The orb reacts to bass, mids,
+            treble, and overall level.
+          </p>
+        </div>
+      </aside>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
