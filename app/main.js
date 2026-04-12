@@ -1,8 +1,8 @@
-import * as THREE from 'https://unpkg.com/three@0.162.0/build/three.module.js';
-import { OrbitControls } from 'https://unpkg.com/three@0.162.0/examples/jsm/controls/OrbitControls.js';
-import { EffectComposer } from 'https://unpkg.com/three@0.162.0/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'https://unpkg.com/three@0.162.0/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'https://unpkg.com/three@0.162.0/examples/jsm/postprocessing/UnrealBloomPass.js';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.162.0/+esm';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/controls/OrbitControls.js/+esm';
+import { EffectComposer } from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/postprocessing/EffectComposer.js/+esm';
+import { RenderPass } from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/postprocessing/RenderPass.js/+esm';
+import { UnrealBloomPass } from 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/postprocessing/UnrealBloomPass.js/+esm';
 import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm';
 
 import { fragmentShader, vertexShader } from './shaders.js';
@@ -295,7 +295,7 @@ fileInput.addEventListener('change', (event) => {
 
 sampleButton.addEventListener('click', async () => {
   try {
-    await loadAudioSource('../data/audio/french_ballet_class.wav', 'french_ballet_class.wav');
+    await loadAudioSource('/data/audio/french_ballet_class.wav', 'french_ballet_class.wav');
   } catch (error) {
     console.error(error);
     updateUiStats({ status: 'Sample load failed' });
