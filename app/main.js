@@ -47,11 +47,11 @@ controls.maxDistance = 18;
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
 scene.add(ambientLight);
 
-const pointLight = new THREE.PointLight(0x9fe8ff, 14, 80);
+const pointLight = new THREE.PointLight(0x9fe8ff, 4, 80);
 pointLight.position.set(0, 0, 8);
 scene.add(pointLight);
 
-const backLight = new THREE.PointLight(0x7f69ff, 16, 80);
+const backLight = new THREE.PointLight(0x7f69ff, 5, 80);
 backLight.position.set(-4, 2, -5);
 scene.add(backLight);
 
@@ -64,10 +64,10 @@ const params = {
   colorA: '#9fe8ff',
   colorB: '#7d63ff',
   wireOpacity: 0.96,
-  coreOpacity: 0.24,
-  bloomStrength: 1.35,
-  bloomRadius: 0.68,
-  bloomThreshold: 0.08,
+  coreOpacity: 0.06,
+  bloomStrength: 0.5,
+  bloomRadius: 0.3,
+  bloomThreshold: 0.35,
   autoRotate: true,
   wireframe: true,
 };
@@ -368,8 +368,8 @@ function computeMetrics() {
   analyser.getByteTimeDomainData(timeDomainData);
 
   const average = frequencyData.reduce((sum, value) => sum + value, 0) / frequencyData.length / 255;
-  const bassSlice = frequencyData.slice(0, 18);
-  const midSlice = frequencyData.slice(18, 80);
+  const bassSlice = frequencyData.slice(0, 30);
+  const midSlice = frequencyData.slice(30, 80);
   const trebleSlice = frequencyData.slice(80);
 
   const bass = bassSlice.reduce((sum, value) => sum + value, 0) / Math.max(1, bassSlice.length) / 255;
@@ -384,7 +384,7 @@ function computeMetrics() {
   rms = Math.sqrt(rms / timeDomainData.length);
 
   smooth.avg = THREE.MathUtils.lerp(smooth.avg, average, 0.18);
-  smooth.bass = THREE.MathUtils.lerp(smooth.bass, bass, 0.22);
+  smooth.bass = THREE.MathUtils.lerp(smooth.bass, bass, 0.38);
   smooth.mid = THREE.MathUtils.lerp(smooth.mid, mid, 0.18);
   smooth.treble = THREE.MathUtils.lerp(smooth.treble, treble, 0.16);
   smooth.rms = THREE.MathUtils.lerp(smooth.rms, rms, 0.18);
@@ -397,6 +397,8 @@ function animate() {
 
   const elapsed = clock.getElapsedTime();
   const metrics = computeMetrics();
+  const bassPulse = 1 + metrics.bass * 0.35;
+
 
   uniforms.uTime.value = elapsed;
   uniforms.uLevel.value = metrics.level;
@@ -410,15 +412,17 @@ function animate() {
   coreUniforms.uMid.value = metrics.mid;
   coreUniforms.uTreble.value = metrics.treble;
 
-  shellMesh.rotation.y += params.autoRotate ? 0.004 + metrics.level * 0.018 : 0.001;
-  shellMesh.rotation.x += params.autoRotate ? 0.0015 + metrics.treble * 0.01 : 0.0;
-  coreMesh.rotation.y -= 0.002 + metrics.mid * 0.006;
-  coreMesh.rotation.x += 0.001;
+  shellMesh.rotation.y += params.autoRotate ? 0.001 + metrics.bass * 0.012 : 0.001;
+  shellMesh.rotation.x += params.autoRotate ? 0.0004 + metrics.bass * 0.004 : 0.0;
+  shellMesh.scale.setScalar(bassPulse);
+  coreMesh.scale.setScalar(0.9 + metrics.bass * 0.25);
+  coreMesh.rotation.y -= 0.0006 + metrics.mid * 0.002;
+  coreMesh.rotation.x += 0.0003;
   stars.rotation.y += 0.00035;
 
-  pointLight.intensity = 10 + metrics.treble * 18;
-  backLight.intensity = 8 + metrics.bass * 20;
-  bloomPass.strength = params.bloomStrength + metrics.level * 0.9;
+  pointLight.intensity = 4 + metrics.bass * 5;
+  backLight.intensity = 3 + metrics.bass * 8;
+  bloomPass.strength = params.bloomStrength + metrics.level * 0.9 + metrics.bass * 1.2;
 
   ui.rms.textContent = metrics.rms.toFixed(3);
   ui.avgFreq.textContent = (metrics.avg * 255).toFixed(1);

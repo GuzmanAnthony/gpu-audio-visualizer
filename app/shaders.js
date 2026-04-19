@@ -60,13 +60,17 @@ export const vertexShader = /* glsl */ `
     float mid = clamp(uMid * uSensitivity, 0.0, 3.0);
     float treble = clamp(uTreble * uSensitivity, 0.0, 3.0);
 
-    float baseNoise = fbm(normal * (2.4 + bass * 0.9) + vec3(time));
+    float baseNoise = fbm(normal * (2.4 + bass * 2.5) + vec3(time));
     float detailNoise = fbm(position * (1.3 + treble * 0.5) - vec3(0.0, time * 1.2, 0.0));
     float ripple = sin((position.y + time * 3.0) * 4.0) * 0.08 * (0.5 + mid);
+    float bassSpike = sin(position.x * 6.0 + time * 2.0)
+                      * sin (position.z * 6.0 + time * 1.5)
+                      * bass * 0.6;
 
-    float displacement = baseNoise * (0.20 + bass * 0.26)
+    float displacement = baseNoise * (0.20 + bass * 0.85)
                        + detailNoise * (0.10 + treble * 0.12)
                        + ripple * (0.3 + level * 0.3);
+                       + bassSpike;
 
     vec3 displaced = p + normal * displacement;
     vDisplacement = displacement;
@@ -84,6 +88,7 @@ export const fragmentShader = /* glsl */ `
   uniform vec3 uColorB;
   uniform float uOpacity;
   uniform float uLevel;
+  uniform float uBass;
 
   varying float vDisplacement;
   varying vec3 vNormalView;
@@ -92,7 +97,7 @@ export const fragmentShader = /* glsl */ `
   void main() {
     float fresnel = pow(1.0 - abs(dot(normalize(vNormalView), vec3(0.0, 0.0, 1.0))), 1.8);
     float glow = smoothstep(0.02, 0.55, vDisplacement + 0.25) + fresnel * 0.8;
-    vec3 color = mix(uColorA, uColorB, clamp(glow + uLevel * 0.2, 0.0, 1.0));
+    vec3 color = mix(uColorA, uColorB, clamp(glow + uLevel * 0.2 + uBass * 0.5, 0.0, 1.0));
     gl_FragColor = vec4(color, clamp(uOpacity + fresnel * 0.2, 0.0, 1.0));
   }
 `;
