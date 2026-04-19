@@ -140,6 +140,19 @@ input[type="range"] {
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
+
+.status-chip {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 .dropzone {
   margin-top: 18px;
   border: 1px dashed rgba(143, 230, 255, 0.35);

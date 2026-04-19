@@ -15,7 +15,7 @@
           <p class="eyebrow">VIST / ECEN 489</p>
           <h1>3D Procedural Audio Visualizer</h1>
           <p class="subcopy">
-            Load a prerecorded audio file and turn it into a reactive 3D orb.
+            Load audio, then optionally load a CUDA generated feature JSON so the browser becomes a renderer instead of the DSP engine.
           </p>
         </div>
 
@@ -27,14 +27,20 @@
         </div>
 
         <div class="control-group compact">
+          <label for="feature-file" class="label">Upload CUDA feature JSON</label>
+          <input id="feature-file" type="file" accept="application/json,.json" />
+          <div class="status-chip" id="feature-source">Feature source: Browser AnalyserNode fallback</div>
+        </div>
+
+        <div class="control-group compact">
           <label for="sensitivity" class="label">Sensitivity</label>
           <input id="sensitivity" type="range" min="0.4" max="3.0" step="0.05" value="1.25" />
           <div class="range-value"><span id="sensitivity-value">1.25x</span></div>
         </div>
 
         <div class="dropzone" id="dropzone">
-          <strong>Drag & drop audio here</strong>
-          <span>WAV, MP3, M4A, OGG, and browser-supported audio formats</span>
+          <strong>Drag and drop audio or feature JSON here</strong>
+          <span>Audio formats supported by the browser plus exported JSON features from the Python CUDA pipeline</span>
         </div>
       </aside>
 
@@ -61,8 +67,8 @@
             <strong id="rms">0.000</strong>
           </div>
           <div class="stat-card">
-            <span>Average Freq</span>
-            <strong id="avg-freq">0.0</strong>
+            <span>Spectral Centroid</span>
+            <strong id="avg-freq">0.0 Hz</strong>
           </div>
           <div class="stat-card accent">
             <span>Bass</span>
@@ -76,8 +82,7 @@
 
         <div class="notes">
           <p>
-            Tip: use the mouse to orbit the camera. The orb reacts to bass, mids,
-            treble, and overall level.
+            Tip: use the mouse to orbit the camera. When a feature JSON is loaded, the orb reacts to CUDA generated RMS, band energy, centroid, and waveform envelope data.
           </p>
         </div>
       </aside>
