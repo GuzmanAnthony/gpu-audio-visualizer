@@ -18,7 +18,6 @@ from audio_utils.features import (
 )
 from audio_utils.wav_loader import DEFAULT_AUDIO_PATH, load_wav_cpu
 from dali_pipeline.audio_decode import dali_available, decode_audio_with_dali
-from gpu_features import compute_feature_bundle_gpu
 from visualization.plot_waveform import save_waveform_plot_from_array
 
 
@@ -68,6 +67,8 @@ def _compute_features(
         return bundle
 
     if backend == "gpu":
+        from gpu_features import compute_feature_bundle_gpu
+
         bundle = compute_feature_bundle_gpu(
             signal,
             sample_rate=sample_rate,

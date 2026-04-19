@@ -69,7 +69,7 @@ export const vertexShader = /* glsl */ `
 
     float displacement = baseNoise * (0.20 + bass * 0.85)
                        + detailNoise * (0.10 + treble * 0.12)
-                       + ripple * (0.3 + level * 0.3);
+                       + ripple * (0.3 + level * 0.3)
                        + bassSpike;
 
     vec3 displaced = p + normal * displacement;
