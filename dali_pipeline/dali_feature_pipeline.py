@@ -30,7 +30,7 @@ def run_dali_pipeline(
     print(f"Min/Max     : {audio.min():.4f} / {audio.max():.4f}")
 
     print("\n==== FEATURE SUMMARY ====")
-    summary = summarize_features(audio)
+    summary = summarize_features(audio, sample_rate=sr)
     print(summary)
 
     print("\n==== SAVING WAVEFORM PLOT ====")

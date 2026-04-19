@@ -206,6 +206,39 @@ let mediaSource = null;
 let frequencyData = null;
 let timeDomainData = null;
 let currentObjectUrl = null;
+let precomputedFeatures = null;
+
+async function uploadAndFetchFeatures(file) {
+  updateUiStats({ status: 'Processing...' });
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch('/features', { method: 'POST', body: form });
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    precomputedFeatures = await res.json();
+    updateUiStats({ status: 'Ready (precomputed)' });
+  } catch (err) {
+    console.warn('Feature fetch failed, falling back to live Web Audio:', err);
+    precomputedFeatures = null;
+    updateUiStats({ status: 'Ready (live)' });
+  }
+}
+
+function getFrameMetrics(currentTime) {
+  const times = precomputedFeatures.times;
+  let idx = times.length - 1;
+  for (let i = 0; i < times.length; i++) {
+    if (times[i] > currentTime) { idx = Math.max(0, i - 1); break; }
+  }
+  return {
+    bass:   precomputedFeatures.bass[idx],
+    mid:    precomputedFeatures.mid[idx],
+    treble: precomputedFeatures.treble[idx],
+    level:  precomputedFeatures.level[idx],
+    rms:    precomputedFeatures.level[idx],
+    avg:    precomputedFeatures.level[idx],
+  };
+}
 
 function ensureAudioGraph() {
   if (!audioContext) {
@@ -280,9 +313,9 @@ async function loadAudioSource(source, label) {
 async function handleFiles(fileList) {
   const file = fileList?.[0];
   if (!file) return;
-
   try {
     await loadAudioSource(file, file.name);
+    await uploadAndFetchFeatures(file);
   } catch (error) {
     console.error(error);
     updateUiStats({ status: 'Load failed' });
@@ -396,7 +429,7 @@ function animate() {
   requestAnimationFrame(animate);
 
   const elapsed = clock.getElapsedTime();
-  const metrics = computeMetrics();
+  const metrics = precomputedFeatures ? getFrameMetrics(audioElement.currentTime): computeMetrics();
   const bassPulse = 1 + metrics.bass * 0.35;
 
 

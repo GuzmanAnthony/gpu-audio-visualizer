@@ -11,6 +11,35 @@ from audio_utils.wav_loader import DEFAULT_AUDIO_PATH, load_wav_cpu
 from dali_pipeline.audio_decode import dali_available, decode_audio_with_dali
 from visualization.plot_waveform import save_waveform_plot_from_array
 
+import tempfile
+from audio_utils.features import compute_fft_bands
+from fastapi import FastAPI, UploadFile
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
+
+app = FastAPI()
+app.mount("/app", StaticFiles(directory="app"), name="app")
+app.mount("/data", StaticFiles(directory="data"), name="data")
+
+@app.post("/features")
+async def get_features(file: UploadFile):
+    suffix = Path(file.filename).suffix or ".wav"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(await file.read())
+        tmp_path = Path(tmp.name)
+
+    try:
+        audio_batch, sr_batch = decode_audio_with_dali(tmp_path)
+        audio = np.asarray(audio_batch[0], dtype=np.float32)
+        if audio.ndim > 1:
+            audio = np.mean(audio, axis=-1)
+        sr = int(np.asarray(sr_batch).reshape(-1)[0])
+    except Exception:
+        audio, sr = load_wav_cpu(tmp_path)
+
+    features = compute_fft_bands(audio, sr)
+    return JSONResponse(content=features)
+
 
 def _load_with_backend(input_path: Path, backend: str):
     if backend == "cpu":
@@ -46,7 +75,7 @@ def main() -> None:
     print("Samples:", len(audio))
     print("Duration:", round(len(audio) / sample_rate, 2), "s")
 
-    summary = summarize_features(audio)
+    summary = summarize_features(audio, sample_rate=sample_rate)
     print("Feature summary:")
     print(json.dumps(summary, indent=2))
 
