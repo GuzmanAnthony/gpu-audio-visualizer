@@ -47,6 +47,10 @@ function setFeatureSource(text, mode = "browser") {
   featureSource.dataset.mode = mode;
 }
 
+function syncPlayButton() {
+  playButton.textContent = state.audioElement.paused ? "Play" : "Pause";
+}
+
 function updateUiStats({ fileName, duration, sampleRate, status } = {}) {
   if (typeof fileName === "string") ui.fileName.textContent = fileName;
   if (typeof duration === "number" && Number.isFinite(duration)) ui.duration.textContent = `${duration.toFixed(2)} s`;
@@ -92,6 +96,7 @@ async function loadAudioSource(source, label) {
   if (source instanceof File) state.currentObjectUrl = objectUrl;
 
   state.audioElement.pause();
+  syncPlayButton();
   state.audioElement.src = objectUrl;
   state.audioElement.load();
 
@@ -121,6 +126,7 @@ async function loadAudioSource(source, label) {
   });
 
   playButton.disabled = false;
+  syncPlayButton();
 }
 
 function arrayMax(values, fallback = 1) {
@@ -676,9 +682,18 @@ playButton.addEventListener("click", async () => {
   }
 });
 
-state.audioElement.addEventListener("play", () => updateUiStats({ status: state.featureBundle ? "Playing with backend CUDA features" : "Playing with browser analyser" }));
-state.audioElement.addEventListener("pause", () => updateUiStats({ status: state.featureBundle ? "Paused with backend CUDA features" : "Paused" }));
-state.audioElement.addEventListener("ended", () => updateUiStats({ status: state.featureBundle ? "Ready with backend CUDA features" : "Audio ready" }));
+state.audioElement.addEventListener("play", () => {
+  syncPlayButton();
+  updateUiStats({ status: state.featureBundle ? "Playing with backend CUDA features" : "Playing with browser analyser" });
+});
+state.audioElement.addEventListener("pause", () => {
+  syncPlayButton();
+  updateUiStats({ status: state.featureBundle ? "Paused with backend CUDA features" : "Paused" });
+});
+state.audioElement.addEventListener("ended", () => {
+  syncPlayButton();
+  updateUiStats({ status: state.featureBundle ? "Ready with backend CUDA features" : "Audio ready" });
+});
 
 sensitivitySlider.addEventListener("input", () => {
   const value = Number(sensitivitySlider.value);
@@ -781,3 +796,5 @@ resetFeatureBundle();
 setMetricText({ rmsActual: 0, centroidActual: 0, bassActual: 0, trebleActual: 0 });
 drawWaveform();
 probeBackendHealth();
+
+syncPlayButton();

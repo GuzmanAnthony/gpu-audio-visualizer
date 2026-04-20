@@ -3,7 +3,7 @@ from __future__ import annotations
 import ctypes
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import numpy as np
 
@@ -38,21 +38,44 @@ class AudioFeatureResult(ctypes.Structure):
     ]
 
 
-def get_default_cuda_library_path() -> Path:
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _candidate_library_paths() -> List[Path]:
+    candidates: List[Path] = []
+
     env_path = os.environ.get("GPU_AUDIO_CUDA_LIB")
     if env_path:
-        return Path(env_path).expanduser().resolve()
-    return Path(__file__).resolve().parents[1] / "cuda_backend" / "build" / "libgpuaudio_features.so"
+        candidates.append(Path(env_path).expanduser().resolve())
+
+    candidates.append(_repo_root() / "cuda_backend" / "build" / "libgpuaudio_features.so")
+    candidates.append(Path.cwd() / "cuda_backend" / "build" / "libgpuaudio_features.so")
+
+    unique: List[Path] = []
+    seen = set()
+    for path in candidates:
+        resolved = path.resolve()
+        if str(resolved) not in seen:
+            seen.add(str(resolved))
+            unique.append(resolved)
+
+    return unique
 
 
-def _load_library() -> ctypes.CDLL:
-    lib_path = get_default_cuda_library_path()
-    if not lib_path.exists():
-        raise FileNotFoundError(
-            f"CUDA feature library not found at {lib_path}. Build it first with cuda_backend/build.sh."
-        )
+def get_default_cuda_library_path() -> Path:
+    return _candidate_library_paths()[0]
 
-    library = ctypes.CDLL(str(lib_path))
+
+def get_cuda_backend_error() -> str:
+    try:
+        _load_library()
+        return ""
+    except Exception as exc:
+        return str(exc)
+
+
+def _configure_library(library: ctypes.CDLL) -> ctypes.CDLL:
     library.compute_audio_features_cuda.argtypes = [
         ctypes.POINTER(ctypes.c_float),
         ctypes.c_int,
@@ -68,12 +91,38 @@ def _load_library() -> ctypes.CDLL:
     return library
 
 
+def _load_library() -> ctypes.CDLL:
+    candidates = _candidate_library_paths()
+    existing = [path for path in candidates if path.exists()]
+
+    if not existing:
+        searched = "\n".join(f"  - {p}" for p in candidates)
+        raise FileNotFoundError(
+            "CUDA feature library was not found.\n"
+            f"Searched:\n{searched}\n"
+            "Build it with: cd cuda_backend && bash build.sh"
+        )
+
+    last_error = None
+    for lib_path in existing:
+        try:
+            library = ctypes.CDLL(str(lib_path), mode=getattr(ctypes, "RTLD_GLOBAL", 0))
+            return _configure_library(library)
+        except OSError as exc:
+            last_error = (
+                f"Found CUDA feature library at {lib_path}, but it could not be loaded.\n"
+                f"Dynamic loader error: {exc}\n"
+                "This usually means CUDA runtime libraries such as libcudart or libcufft "
+                "are not on LD_LIBRARY_PATH when the server starts."
+            )
+        except Exception as exc:
+            last_error = f"Failed to initialize CUDA feature library at {lib_path}: {exc}"
+
+    raise RuntimeError(last_error or "Unknown CUDA backend load error.")
+
+
 def cuda_backend_available() -> bool:
-    try:
-        _load_library()
-        return True
-    except Exception:
-        return False
+    return get_cuda_backend_error() == ""
 
 
 def _copy_ptr_to_array(ptr: ctypes.POINTER(ctypes.c_float), length: int) -> np.ndarray:
@@ -114,12 +163,14 @@ def compute_feature_bundle_gpu(
 
         num_frames = int(result.num_frames)
         waveform_count = int(result.waveform_buckets)
+
         frame_times = (
             (np.arange(num_frames, dtype=np.float32) * int(result.hop_size) + 0.5 * int(result.frame_size))
             / float(result.sample_rate)
             if num_frames > 0
             else np.empty((0,), dtype=np.float32)
         )
+
         waveform_times = (
             (np.arange(waveform_count, dtype=np.float32) + 0.5)
             * (float(result.num_samples) / max(1, waveform_count))

@@ -12,7 +12,12 @@ from fastapi.staticfiles import StaticFiles
 from audio_utils.features import compute_feature_bundle_cpu, feature_bundle_to_json_ready
 from audio_utils.wav_loader import load_wav_cpu
 from dali_pipeline.audio_decode import dali_available, decode_audio_with_dali
-from gpu_features.cuda_bridge import compute_feature_bundle_gpu, cuda_backend_available
+from gpu_features.cuda_bridge import (
+    compute_feature_bundle_gpu,
+    cuda_backend_available,
+    get_cuda_backend_error,
+    get_default_cuda_library_path,
+)
 
 ROOT = Path(__file__).resolve().parent
 APP_DIR = ROOT / 'app'
@@ -85,7 +90,7 @@ def _compute_feature_bundle(signal: np.ndarray, sample_rate: int, feature_backen
     requested = feature_backend.lower()
     if requested == 'gpu':
         if not cuda_backend_available():
-            raise RuntimeError('CUDA feature backend is unavailable. Build cuda_backend/build/libgpuaudio_features.so first.')
+            raise RuntimeError(get_cuda_backend_error())
         return compute_feature_bundle_gpu(signal, sample_rate)
     if requested == 'cpu':
         return compute_feature_bundle_cpu(signal, sample_rate)
@@ -103,9 +108,12 @@ def _compute_from_path(file_path: Path, decode_backend: str, feature_backend: st
 
 @app.get('/api/health')
 def health() -> dict[str, Any]:
+    backend_error = get_cuda_backend_error()
     return {
         'status': 'ok',
-        'cuda_backend_available': cuda_backend_available(),
+        'cuda_backend_available': backend_error == '',
+        'cuda_backend_error': backend_error,
+        'cuda_backend_path': str(get_default_cuda_library_path()),
         'dali_available': dali_available(),
         'samples': sorted(_sample_lookup().keys()),
     }
