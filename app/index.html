@@ -15,21 +15,21 @@
           <p class="eyebrow">VIST / ECEN 489</p>
           <h1>3D Procedural Audio Visualizer</h1>
           <p class="subcopy">
-            Load audio, then optionally load a CUDA generated feature JSON so the browser becomes a renderer instead of the DSP engine.
+            Load audio and the backend will process it on the server using the CUDA feature pipeline. The browser becomes the renderer for backend produced feature arrays, with browser DSP only as a fallback.
           </p>
         </div>
 
         <div class="control-group">
           <label for="audio-file" class="label">Upload audio</label>
           <input id="audio-file" type="file" accept="audio/*" />
-          <button id="sample-button" class="button secondary">Load bundled sample</button>
+          <button id="sample-button" class="button secondary">Load bundled sample from backend</button>
           <button id="play-button" class="button" disabled>Play</button>
         </div>
 
         <div class="control-group compact">
-          <label for="feature-file" class="label">Upload CUDA feature JSON</label>
+          <label for="feature-file" class="label">Optional manual feature JSON override</label>
           <input id="feature-file" type="file" accept="application/json,.json" />
-          <div class="status-chip" id="feature-source">Feature source: Browser AnalyserNode fallback</div>
+          <div class="status-chip" id="feature-source">Feature source: Waiting for backend CUDA features</div>
         </div>
 
         <div class="control-group compact">
@@ -40,7 +40,7 @@
 
         <div class="dropzone" id="dropzone">
           <strong>Drag and drop audio or feature JSON here</strong>
-          <span>Audio formats supported by the browser plus exported JSON features from the Python CUDA pipeline</span>
+          <span>Drop audio here to upload it for backend processing, or drop a JSON file to override with precomputed features manually</span>
         </div>
       </aside>
 
@@ -82,12 +82,20 @@
 
         <div class="notes">
           <p>
-            Tip: use the mouse to orbit the camera. When a feature JSON is loaded, the orb reacts to CUDA generated RMS, band energy, centroid, and waveform envelope data.
+            Tip: use the mouse to orbit the camera. Uploaded audio and the bundled sample both request backend generated CUDA features first. Manual JSON upload is still available for offline playback demos.
           </p>
         </div>
       </aside>
     </div>
 
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"
+        }
+      }
+    </script>
     <script type="module" src="./main.js"></script>
   </body>
 </html>

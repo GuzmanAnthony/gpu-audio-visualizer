@@ -1,3 +1,5 @@
 numpy
 matplotlib
-nvidia-dali-cuda120
+fastapi
+uvicorn[standard]
+python-multipart

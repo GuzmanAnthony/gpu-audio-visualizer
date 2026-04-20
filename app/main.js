@@ -1,8 +1,8 @@
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
-import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/controls/OrbitControls.js";
-import { EffectComposer } from "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/postprocessing/EffectComposer.js";
-import { RenderPass } from "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/postprocessing/RenderPass.js";
-import { UnrealBloomPass } from "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/postprocessing/UnrealBloomPass.js";
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { vertexShader, fragmentShader } from "./shaders.js";
 
 const audioInput = document.getElementById("audio-file");
@@ -13,6 +13,8 @@ const sensitivitySlider = document.getElementById("sensitivity");
 const sensitivityValue = document.getElementById("sensitivity-value");
 const dropzone = document.getElementById("dropzone");
 const featureSource = document.getElementById("feature-source");
+const API_BASE = "/api";
+const DEFAULT_SAMPLE_NAME = "french_ballet_class.wav";
 
 const ui = {
   fileName: document.getElementById("file-name"),
@@ -34,10 +36,16 @@ const state = {
   timeDomainData: null,
   featureBundle: null,
   currentObjectUrl: null,
+  backendRequestToken: 0,
 };
 
 state.audioElement.crossOrigin = "anonymous";
 state.audioElement.preload = "auto";
+
+function setFeatureSource(text, mode = "browser") {
+  featureSource.textContent = text;
+  featureSource.dataset.mode = mode;
+}
 
 function updateUiStats({ fileName, duration, sampleRate, status } = {}) {
   if (typeof fileName === "string") ui.fileName.textContent = fileName;
@@ -109,7 +117,7 @@ async function loadAudioSource(source, label) {
     fileName: label,
     duration: Number.isFinite(state.audioElement.duration) ? state.audioElement.duration : 0,
     sampleRate: state.featureBundle?.sampleRate ?? state.audioContext?.sampleRate ?? 0,
-    status: state.featureBundle ? "Ready (CUDA feature sync available)" : "Ready",
+    status: state.featureBundle ? "Ready with backend CUDA features" : "Audio ready",
   });
 
   playButton.disabled = false;
@@ -333,11 +341,11 @@ function computeBrowserMetrics() {
 }
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x040816);
-scene.fog = new THREE.FogExp2(0x050816, 0.06);
+scene.background = new THREE.Color(0x04060d);
+scene.fog = new THREE.FogExp2(0x04060d, 0.08);
 
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(0, 0.4, 9.5);
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(0, 0.3, 9.2);
 
 const renderer = new THREE.WebGLRenderer({
   canvas: document.getElementById("scene"),
@@ -350,26 +358,28 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.25, 0.6, 0.2);
-bloomPass.threshold = 0.08;
-bloomPass.radius = 0.55;
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.3, 0.6, 0.2);
+bloomPass.strength = 0.5;
+bloomPass.radius = 0.3;
+bloomPass.threshold = 0.35;
 composer.addPass(bloomPass);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.dampingFactor = 0.08;
-controls.minDistance = 5;
-controls.maxDistance = 16;
+controls.dampingFactor = 0.06;
+controls.enablePan = false;
+controls.minDistance = 5.2;
+controls.maxDistance = 18;
 
-const ambientLight = new THREE.AmbientLight(0x8ca4ff, 1.2);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
 scene.add(ambientLight);
 
-const pointLight = new THREE.PointLight(0x8f73ff, 5, 30);
-pointLight.position.set(4, 5, 6);
+const pointLight = new THREE.PointLight(0x9fe8ff, 4, 80);
+pointLight.position.set(0, 0, 8);
 scene.add(pointLight);
 
-const backLight = new THREE.PointLight(0x00d8ff, 4, 25);
-backLight.position.set(-5, -2, -4);
+const backLight = new THREE.PointLight(0x7f69ff, 5, 80);
+backLight.position.set(-4, 2, -5);
 scene.add(backLight);
 
 const shellUniforms = {
@@ -379,38 +389,38 @@ const shellUniforms = {
   uMid: { value: 0 },
   uTreble: { value: 0 },
   uSensitivity: { value: Number(sensitivitySlider.value) },
-  uColorA: { value: new THREE.Color("#5b55ff") },
-  uColorB: { value: new THREE.Color("#6fe7ff") },
-  uOpacity: { value: 0.92 },
+  uColorA: { value: new THREE.Color("#9fe8ff") },
+  uColorB: { value: new THREE.Color("#7d63ff") },
+  uOpacity: { value: 0.96 },
 };
 
 const coreUniforms = {
-  uTime: { value: 0 },
-  uLevel: { value: 0 },
-  uBass: { value: 0 },
-  uMid: { value: 0 },
-  uTreble: { value: 0 },
-  uSensitivity: { value: Number(sensitivitySlider.value) },
-  uColorA: { value: new THREE.Color("#ff4fe3") },
-  uColorB: { value: new THREE.Color("#7af7ff") },
-  uOpacity: { value: 0.88 },
+  uTime: shellUniforms.uTime,
+  uLevel: shellUniforms.uLevel,
+  uBass: shellUniforms.uBass,
+  uMid: shellUniforms.uMid,
+  uTreble: shellUniforms.uTreble,
+  uSensitivity: shellUniforms.uSensitivity,
+  uColorA: { value: new THREE.Color("#f5f9ff") },
+  uColorB: { value: new THREE.Color("#9fe8ff") },
+  uOpacity: { value: 0.08 },
 };
 
 const shellMesh = new THREE.Mesh(
-  new THREE.IcosahedronGeometry(1.85, 26),
+  new THREE.IcosahedronGeometry(2.65, 32),
   new THREE.ShaderMaterial({
     uniforms: shellUniforms,
     vertexShader,
     fragmentShader,
     transparent: true,
     blending: THREE.AdditiveBlending,
+    wireframe: true,
     depthWrite: false,
   }),
 );
-scene.add(shellMesh);
 
 const coreMesh = new THREE.Mesh(
-  new THREE.IcosahedronGeometry(1.05, 18),
+  new THREE.IcosahedronGeometry(2.32, 20),
   new THREE.ShaderMaterial({
     uniforms: coreUniforms,
     vertexShader,
@@ -420,17 +430,10 @@ const coreMesh = new THREE.Mesh(
     depthWrite: false,
   }),
 );
-scene.add(coreMesh);
 
-const wireframe = new THREE.LineSegments(
-  new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(2.25, 1)),
-  new THREE.LineBasicMaterial({
-    color: 0x6f74ff,
-    transparent: true,
-    opacity: 0.28,
-  }),
-);
-scene.add(wireframe);
+scene.add(coreMesh);
+scene.add(shellMesh);
+const wireframe = shellMesh;
 
 const starGeometry = new THREE.BufferGeometry();
 const starCount = 1800;
@@ -541,26 +544,67 @@ function drawWaveform() {
   waveformTexture.needsUpdate = true;
 }
 
-function resetFeatureBundle() {
+function resetFeatureBundle(statusOverride) {
   state.featureBundle = null;
-  featureSource.textContent = "Feature source: Browser AnalyserNode fallback";
-  featureSource.dataset.mode = "browser";
+  setFeatureSource("Feature source: Browser AnalyserNode fallback", "browser");
   updateUiStats({
     sampleRate: state.audioContext?.sampleRate ?? 0,
-    status: state.audioElement.src ? "Ready" : "Idle",
+    status: statusOverride ?? (state.audioElement.src ? "Audio ready" : "Idle"),
+  });
+}
+
+function applyFeatureBundle(raw, descriptor) {
+  state.featureBundle = normalizeFeatureBundle(raw);
+  const gpuMs = Number(state.featureBundle?.timings?.total_gpu ?? raw?.timings_ms?.total_gpu ?? 0);
+  const timingText = Number.isFinite(gpuMs) && gpuMs > 0 ? ` • GPU ${gpuMs.toFixed(2)} ms` : "";
+  setFeatureSource(`Feature source: ${descriptor}${timingText}`, "cuda");
+  updateUiStats({
+    sampleRate: state.featureBundle.sampleRate,
+    status: state.audioElement.src ? "Ready with backend CUDA features" : "Backend CUDA features loaded",
   });
 }
 
 async function loadFeatureJsonFile(file) {
   const text = await file.text();
   const raw = JSON.parse(text);
-  state.featureBundle = normalizeFeatureBundle(raw);
-  featureSource.textContent = `Feature source: ${state.featureBundle.backend.toUpperCase()} feature JSON`;
-  featureSource.dataset.mode = "cuda";
-  updateUiStats({
-    sampleRate: state.featureBundle.sampleRate,
-    status: state.audioElement.src ? "Ready (CUDA feature sync available)" : "CUDA features loaded",
+  applyFeatureBundle(raw, `${(raw.backend ?? "manual").toUpperCase()} manual feature JSON`);
+}
+
+async function fetchBackendFeaturesForFile(file, label) {
+  const requestToken = ++state.backendRequestToken;
+  setFeatureSource("Feature source: Requesting backend CUDA features…", "pending");
+  updateUiStats({ status: "Uploading audio to backend" });
+
+  const formData = new FormData();
+  formData.append("file", file, label || file.name || "audio.wav");
+
+  const response = await fetch(`${API_BASE}/features?decode_backend=auto&feature_backend=gpu`, {
+    method: "POST",
+    body: formData,
   });
+
+  const payload = await response.json().catch(() => ({}));
+  if (requestToken !== state.backendRequestToken) return;
+  if (!response.ok) {
+    throw new Error(payload?.detail || "Backend CUDA processing failed.");
+  }
+
+  applyFeatureBundle(payload, `${(payload.decode_backend ?? "backend").toUpperCase()} decode + ${(payload.backend ?? "gpu").toUpperCase()} features`);
+}
+
+async function fetchBackendFeaturesForSample(sampleName = DEFAULT_SAMPLE_NAME) {
+  const requestToken = ++state.backendRequestToken;
+  setFeatureSource("Feature source: Fetching bundled sample features from backend…", "pending");
+  updateUiStats({ status: "Requesting bundled sample CUDA features" });
+
+  const response = await fetch(`${API_BASE}/sample/features?name=${encodeURIComponent(sampleName)}&decode_backend=auto&feature_backend=gpu`);
+  const payload = await response.json().catch(() => ({}));
+  if (requestToken !== state.backendRequestToken) return;
+  if (!response.ok) {
+    throw new Error(payload?.detail || "Backend sample feature request failed.");
+  }
+
+  applyFeatureBundle(payload, `${(payload.decode_backend ?? "backend").toUpperCase()} decode + ${(payload.backend ?? "gpu").toUpperCase()} sample features`);
 }
 
 async function handleFiles(fileList) {
@@ -573,7 +617,14 @@ async function handleFiles(fileList) {
       return;
     }
 
+    resetFeatureBundle("Audio ready, requesting backend CUDA features");
     await loadAudioSource(file, file.name);
+    try {
+      await fetchBackendFeaturesForFile(file, file.name);
+    } catch (backendError) {
+      console.error(backendError);
+      resetFeatureBundle("Backend unavailable, using browser analyser fallback");
+    }
   } catch (error) {
     console.error(error);
     updateUiStats({ status: "Load failed" });
@@ -597,7 +648,14 @@ featureInput.addEventListener("change", async (event) => {
 
 sampleButton.addEventListener("click", async () => {
   try {
-    await loadAudioSource("/data/audio/french_ballet_class.wav", "french_ballet_class.wav");
+    resetFeatureBundle("Loading bundled sample and requesting backend CUDA features");
+    await loadAudioSource(`/data/audio/${DEFAULT_SAMPLE_NAME}`, DEFAULT_SAMPLE_NAME);
+    try {
+      await fetchBackendFeaturesForSample(DEFAULT_SAMPLE_NAME);
+    } catch (backendError) {
+      console.error(backendError);
+      resetFeatureBundle("Sample loaded, backend unavailable so browser analyser fallback is active");
+    }
   } catch (error) {
     console.error(error);
     updateUiStats({ status: "Sample load failed" });
@@ -618,9 +676,9 @@ playButton.addEventListener("click", async () => {
   }
 });
 
-state.audioElement.addEventListener("play", () => updateUiStats({ status: state.featureBundle ? "Playing with CUDA features" : "Playing" }));
-state.audioElement.addEventListener("pause", () => updateUiStats({ status: state.featureBundle ? "Paused with CUDA features" : "Paused" }));
-state.audioElement.addEventListener("ended", () => updateUiStats({ status: state.featureBundle ? "Ready (CUDA feature sync available)" : "Ready" }));
+state.audioElement.addEventListener("play", () => updateUiStats({ status: state.featureBundle ? "Playing with backend CUDA features" : "Playing with browser analyser" }));
+state.audioElement.addEventListener("pause", () => updateUiStats({ status: state.featureBundle ? "Paused with backend CUDA features" : "Paused" }));
+state.audioElement.addEventListener("ended", () => updateUiStats({ status: state.featureBundle ? "Ready with backend CUDA features" : "Audio ready" }));
 
 sensitivitySlider.addEventListener("input", () => {
   const value = Number(sensitivitySlider.value);
@@ -650,6 +708,26 @@ dropzone.addEventListener("drop", (event) => {
 window.addEventListener("dragover", (event) => event.preventDefault());
 window.addEventListener("drop", (event) => event.preventDefault());
 
+async function probeBackendHealth() {
+  try {
+    const response = await fetch(`${API_BASE}/health`);
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload?.detail || "Backend health probe failed.");
+
+    if (payload.cuda_backend_available) {
+      setFeatureSource(`Feature source: Backend ready • CUDA ${payload.dali_available ? "and DALI" : "ready"}`, "ready");
+      updateUiStats({ status: "Idle • backend CUDA ready" });
+    } else {
+      setFeatureSource("Feature source: Backend reachable but CUDA backend is not built yet", "browser");
+      updateUiStats({ status: "Idle • backend reachable, browser fallback active" });
+    }
+  } catch (error) {
+    console.warn(error);
+    setFeatureSource("Feature source: Backend not reachable, browser fallback active", "browser");
+    updateUiStats({ status: "Idle • backend not reachable" });
+  }
+}
+
 const clock = new THREE.Clock();
 
 function animate() {
@@ -657,7 +735,7 @@ function animate() {
 
   const elapsed = clock.getElapsedTime();
   const metrics = state.featureBundle ? computeFeatureDrivenMetrics() : computeBrowserMetrics();
-  const bassPulse = 1 + metrics.bass * 0.34;
+  const bassPulse = 1 + metrics.bass * 0.35;
 
   shellUniforms.uTime.value = elapsed;
   shellUniforms.uLevel.value = metrics.level;
@@ -665,27 +743,19 @@ function animate() {
   shellUniforms.uMid.value = metrics.mid;
   shellUniforms.uTreble.value = metrics.treble;
 
-  coreUniforms.uTime.value = elapsed + 0.6;
-  coreUniforms.uLevel.value = metrics.level;
-  coreUniforms.uBass.value = metrics.bass;
-  coreUniforms.uMid.value = metrics.mid;
-  coreUniforms.uTreble.value = metrics.treble;
-
-  shellMesh.rotation.y += 0.0016 + metrics.bass * 0.012;
-  shellMesh.rotation.x += 0.0004 + metrics.mid * 0.0018;
+  shellMesh.rotation.y += 0.001 + metrics.bass * 0.012;
+  shellMesh.rotation.x += 0.0004 + metrics.bass * 0.004;
   shellMesh.scale.setScalar(bassPulse);
 
-  coreMesh.rotation.y -= 0.0012 + metrics.mid * 0.0024;
-  coreMesh.rotation.x += 0.0006;
-  coreMesh.scale.setScalar(0.92 + metrics.bass * 0.24 + metrics.treble * 0.12);
+  coreMesh.scale.setScalar(0.9 + metrics.bass * 0.25);
+  coreMesh.rotation.y -= 0.0006 + metrics.mid * 0.002;
+  coreMesh.rotation.x += 0.0003;
 
-  wireframe.rotation.y -= 0.0011;
-  wireframe.rotation.x += 0.0005;
-  stars.rotation.y += 0.00025;
+  stars.rotation.y += 0.00035;
 
-  pointLight.intensity = 4.2 + metrics.bass * 6.5;
-  backLight.intensity = 2.6 + metrics.treble * 7.0;
-  bloomPass.strength = 1.1 + metrics.level * 1.0 + metrics.bass * 1.15;
+  pointLight.intensity = 4.0 + metrics.bass * 3.0;
+  backLight.intensity = 5.0 + metrics.mid * 2.0;
+  bloomPass.strength = 0.5 + metrics.level * 0.9;
   waveformPlane.material.opacity = 0.22 + metrics.rms * 0.45;
   waveformPlane.lookAt(camera.position);
 
@@ -710,3 +780,4 @@ window.addEventListener("resize", onResize);
 resetFeatureBundle();
 setMetricText({ rmsActual: 0, centroidActual: 0, bassActual: 0, trebleActual: 0 });
 drawWaveform();
+probeBackendHealth();

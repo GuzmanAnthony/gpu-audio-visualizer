@@ -3,63 +3,66 @@ VIST/ECEN 489 – Spring 2026
 Anthony Guzman & Jason Agnew
 
 ## Overview
-This version shifts the project toward a real CUDA centered pipeline.
+This final integrated version keeps the real computation in the backend and uses the browser as the renderer.
 
-The browser is no longer treated as the main DSP engine. Instead, the intended flow is:
+The intended pipeline is:
 
-1. Decode audio on the host side.
-2. Run feature extraction in native CUDA.
-3. Export compact feature arrays.
-4. Load those CUDA generated features into the browser visualizer.
+1. Load an offline audio file.
+2. Decode on the backend with DALI when available or CPU WAV fallback.
+3. Run feature extraction with the native CUDA backend.
+4. Return compact feature arrays through the FastAPI server.
+5. Render the orb in the browser from backend produced data.
 
-That makes the browser a renderer and playback surface, while the heavy analysis work happens in CUDA.
+That keeps the project aligned with the GPU class because the feature extraction stage is the main computation and it happens in CUDA rather than in browser DSP code.
 
-## What is new in this update
-- Added a native CUDA backend in `cuda_backend/`.
-- Added a Python wrapper in `gpu_features.py` that calls the shared library through `ctypes`.
-- Reworked feature extraction so the CPU and GPU paths produce the same bundle structure.
-- Added CUDA kernels for:
-  - fused RMS and peak reduction
-  - waveform min and max downsampling
-  - Hann windowing
-  - spectral band energy and centroid extraction after cuFFT
-- Added cuFFT based batched spectral analysis.
-- Added timing breakdowns for H2D, kernels, FFT, D2H, GPU only, and full wall time.
-- Added a CPU vs GPU benchmark for feature extraction.
-- Updated the browser app so it can load exported CUDA feature JSON and use that as the primary animation source.
+## What is in the final integrated version
+- Native CUDA backend in `cuda_backend/`
+- Python `ctypes` bridge in `gpu_features/cuda_bridge.py`
+- FastAPI server in `server.py`
+- Frontend orb visualizer in `app/`
+- Backend sample and upload routes that feed the orb directly
+- Optional DALI decode path for backend audio loading
+- CPU reference path kept for debugging and validation
 
 ## Project structure
+- `app/` – browser orb visualizer
 - `audio_utils/` – CPU WAV loading and CPU reference feature extraction
-- `cuda_backend/` – CUDA C++ shared library and build files
-- `gpu_features.py` – Python wrapper for the CUDA backend
-- `benchmarks/compare_features.py` – CPU vs GPU feature benchmark
-- `dali_pipeline/` – optional DALI decode experiments
-- `visualization/` – waveform plotting utilities
-- `app/` – browser visualizer that can use CUDA exported feature JSON
+- `cuda_backend/` – CUDA C++ shared library and build script
+- `dali_pipeline/` – optional DALI decode helper
+- `gpu_features/` – Python bridge into the CUDA shared library
+- `benchmarks/` – comparison scripts
 - `data/audio/` – bundled sample audio
+- `server.py` – integrated backend plus static frontend server
 
-## CUDA backend design
-The CUDA backend expects mono float audio and computes:
+## CUDA feature pipeline
+The CUDA backend computes:
 - frame RMS
 - frame peak
 - frame bass energy
 - frame mid energy
 - frame treble energy
 - frame spectral centroid
-- waveform min and max envelope buckets
+- waveform min and max display buckets
 
 ### CUDA mapping
-- **One block per frame** for RMS and peak reduction
-- **Shared memory reductions** for per frame sum of squares and maxima
-- **Batched cuFFT** for frame spectra
-- **One block per frame** for band energy accumulation and centroid calculation
-- **One block per waveform bucket** for min and max downsampling
+- one block per frame for RMS and peak reduction
+- shared memory reductions inside each block
+- batched cuFFT for windowed spectra
+- one block per frame for band energy and centroid accumulation
+- one block per waveform bucket for min and max downsampling
 
-## Python setup
+## Python environment
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+### Optional DALI install
+Install DALI only on a machine that has a matching CUDA setup.
+
+```bash
+pip install -r requirements-optional-dali.txt
 ```
 
 ## Build the CUDA backend
@@ -71,14 +74,65 @@ cd cuda_backend
 cd ..
 ```
 
-This builds `cuda_backend/build/libgpuaudio_features.so`.
+This should produce:
 
-## Run the CPU reference path
+```text
+cuda_backend/build/libgpuaudio_features.so
+```
+
+## Run the integrated backend plus frontend
+From the repo root:
+
+```bash
+uvicorn server:app --host 0.0.0.0 --port 8000
+```
+
+Open the app in a browser:
+
+```text
+http://localhost:8000/
+```
+
+## Browser workflow
+### Bundled sample
+1. Click **Load bundled sample from backend**.
+2. The audio loads in the browser for playback.
+3. The frontend requests backend CUDA features from `/api/sample/features`.
+4. The orb renders from backend produced arrays.
+
+### Uploaded audio
+1. Upload an audio file.
+2. The browser loads it for playback.
+3. The same file is uploaded to `/api/features`.
+4. The backend decodes the file and runs CUDA feature extraction.
+5. The orb renders from the returned feature bundle.
+
+### Manual JSON override
+You can still load a pre exported feature JSON manually for offline demos.
+
+## API routes
+- `GET /api/health` – backend status, sample list, CUDA availability, DALI availability
+- `GET /api/sample/features` – compute features for a bundled sample
+- `POST /api/features` – upload audio and compute features
+
+## HPRC usage
+On the cluster:
+
+```bash
+module load CUDA/11.8.0
+source .venv/bin/activate
+uvicorn server:app --host 0.0.0.0 --port 8000
+```
+
+Then tunnel the port from your local machine and open the app through that forwarded address.
+
+## CPU reference and benchmarking
+### CPU reference path
 ```bash
 python main.py --input data/audio/french_ballet_class.wav --decode-backend cpu --feature-backend cpu --plot
 ```
 
-## Run the CUDA feature path
+### GPU feature path
 ```bash
 python main.py \
   --input data/audio/french_ballet_class.wav \
@@ -87,17 +141,7 @@ python main.py \
   --export-json outputs/french_ballet_class_features.json
 ```
 
-## Optional DALI decode experiment
-DALI remains an experiment for decode side comparisons. The CUDA work for the class project is in the custom backend, not in DALI.
-
-```bash
-python main.py \
-  --input data/audio/french_ballet_class.wav \
-  --decode-backend dali \
-  --feature-backend gpu
-```
-
-## Benchmark CPU vs GPU features
+### CPU vs GPU benchmark
 ```bash
 python -m benchmarks.compare_features \
   --input data/audio/french_ballet_class.wav \
@@ -105,35 +149,7 @@ python -m benchmarks.compare_features \
   --warmup 2
 ```
 
-The benchmark reports:
-- CPU mean, median, std, min, max
-- GPU mean, median, std, min, max
-- average GPU kernel timing breakdown
-- max absolute difference between CPU and GPU outputs
-- overall CPU over GPU speedup
-
-## Browser visualizer
-Serve the repo root with a simple static server:
-
-```bash
-python -m http.server 8000
-```
-
-Then open:
-
-```text
-http://localhost:8000/app/index.html
-```
-
-### Browser workflow
-1. Load an audio file.
-2. Export a feature JSON from the Python CUDA pipeline.
-3. Load that JSON in the browser.
-4. Press play.
-
-When the JSON is loaded, the visualizer uses CUDA generated RMS, band energy, centroid, and waveform envelope data instead of relying only on the browser AnalyserNode path.
-
 ## Notes
-- The decode side can still be CPU or DALI depending on the machine.
-- The main course aligned work is the custom CUDA feature extraction path.
-- The CPU implementation remains in the repo as a correctness baseline and benchmarking reference.
+- DALI is optional and mainly used for backend decode experiments.
+- The class critical computation is the custom CUDA feature extraction path.
+- The frontend keeps the browser analyser only as a fallback when backend CUDA features are unavailable.

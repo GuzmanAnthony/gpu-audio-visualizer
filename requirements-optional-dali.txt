@@ -1,1 +1,1 @@
-nvidia-dali-cuda120>=1.40.0
+nvidia-dali-cuda120
